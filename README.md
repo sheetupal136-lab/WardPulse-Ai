@@ -141,4 +141,4 @@ Runs at: `http://127.0.0.1:8000` (Interactive API docs at `http://127.0.0.1:8000
 cd frontend
 npm run dev
 ```
-Runs at: `http://localhost:5173`.
+Runs at:https://wardpulse-ai.vercel.app
