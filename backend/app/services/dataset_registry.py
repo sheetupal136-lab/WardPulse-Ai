@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import pandas as pd
 import numpy as np
 
+from app.core.storage import get_writable_data_dir, get_current_dataset_path
 from app.schemas.ml import (
     DatasetColumnInfo,
     DatasetInspectionResponse,
@@ -20,7 +21,7 @@ logger = logging.getLogger("wardpulse_backend.dataset_registry")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.join(BASE_DIR, "data")
-CURRENT_DATASET_PATH = os.path.join(DATA_DIR, "current_dataset.csv")
+CURRENT_DATASET_PATH = get_current_dataset_path()
 
 # Potential raw data locations
 POSSIBLE_RAW_DIRS = [
@@ -345,8 +346,12 @@ class DatasetRegistryService:
                     "Please upload this dataset manually via the CSV Upload section."
                 )
             
-            shutil.copy(wf_path, CURRENT_DATASET_PATH)
-            df = pd.read_csv(CURRENT_DATASET_PATH)
+            df = pd.read_csv(wf_path)
+            try:
+                target_path = get_current_dataset_path()
+                shutil.copy(wf_path, target_path)
+            except Exception as e:
+                logger.warning(f"Could not copy to {get_current_dataset_path()}: {e}")
             return inspect_dataframe_extended(
                 df=df,
                 filename="ward_features.csv",
@@ -399,8 +404,17 @@ class DatasetRegistryService:
 
         # Check if pre-aggregated training dataset already exists
         if joined_csv and os.path.exists(joined_csv):
-            shutil.copy(joined_csv, CURRENT_DATASET_PATH)
-            df = pd.read_csv(CURRENT_DATASET_PATH)
+            df = pd.read_csv(joined_csv)
+            try:
+                from app.services.ml_service import MLService
+                MLService.set_current_dataframe(df)
+            except Exception:
+                pass
+            try:
+                target_path = get_current_dataset_path()
+                shutil.copy(joined_csv, target_path)
+            except Exception as e:
+                logger.warning(f"Could not copy to {get_current_dataset_path()}: {e}")
             return inspect_dataframe_extended(
                 df=df,
                 filename="municipal_ward_complaints_training.csv",
@@ -452,9 +466,12 @@ class DatasetRegistryService:
         joined = pd.merge(wf, ward_grievances, on="ward_id", how="inner")
 
         # Save to disk
-        joined.to_csv(CURRENT_DATASET_PATH, index=False)
-        default_save = os.path.join(DATA_DIR, "municipal_ward_complaints_training.csv")
-        joined.to_csv(default_save, index=False)
+        try:
+            joined.to_csv(get_current_dataset_path(), index=False)
+            default_save = os.path.join(DATA_DIR, "municipal_ward_complaints_training.csv")
+            joined.to_csv(default_save, index=False)
+        except Exception as e:
+            logger.warning(f"Could not save dynamic join to disk: {e}")
 
         return inspect_dataframe_extended(
             df=joined,

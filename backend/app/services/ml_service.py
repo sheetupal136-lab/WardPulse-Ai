@@ -1,4 +1,5 @@
 import os
+import io
 import shutil
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
@@ -33,14 +34,21 @@ from app.services.dataset_registry import (
     get_raw_data_dir,
     extract_ward_coordinates
 )
+from app.core.storage import (
+    get_writable_data_dir,
+    get_current_dataset_path,
+    get_saved_model_path,
+    resolve_model_path_for_reading,
+    get_writable_model_dir
+)
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "saved_models")
-CURRENT_DATASET_PATH = os.path.join(DATA_DIR, "current_dataset.csv")
-SAVED_MODEL_PATH = os.path.join(MODEL_DIR, "ward_pulse_model.joblib")
+CURRENT_DATASET_PATH = get_current_dataset_path()
+SAVED_MODEL_PATH = get_saved_model_path()
 
 # Check root/data or backend/data for default dataset
 DEFAULT_TRAINING_DATASET = os.path.join(ROOT_DIR, "data", "municipal_ward_complaints_training.csv")
@@ -204,34 +212,58 @@ def _extract_feature_vector_for_row(
 
 
 class MLService:
+    _in_memory_df: Optional[pd.DataFrame] = None
+    _in_memory_model_payload: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def set_current_dataframe(cls, df: Optional[pd.DataFrame]):
+        cls._in_memory_df = df.copy() if df is not None else None
+
     @staticmethod
     def load_dataset_from_disk() -> Optional[pd.DataFrame]:
-        """Loads the current working dataset from disk, falling back to benchmark training data if available."""
-        if os.path.exists(CURRENT_DATASET_PATH):
-            return pd.read_csv(CURRENT_DATASET_PATH)
+        """Loads the current working dataset from memory or disk, falling back to benchmark training data."""
+        if MLService._in_memory_df is not None:
+            return MLService._in_memory_df.copy()
+
+        current_path = get_current_dataset_path()
+        if os.path.exists(current_path):
+            try:
+                df = pd.read_csv(current_path)
+                MLService._in_memory_df = df
+                return df.copy()
+            except Exception:
+                pass
+
         if os.path.exists(DEFAULT_TRAINING_DATASET):
-            shutil.copy(DEFAULT_TRAINING_DATASET, CURRENT_DATASET_PATH)
-            return pd.read_csv(CURRENT_DATASET_PATH)
+            try:
+                df = pd.read_csv(DEFAULT_TRAINING_DATASET)
+                MLService._in_memory_df = df
+                try:
+                    shutil.copy(DEFAULT_TRAINING_DATASET, current_path)
+                except Exception:
+                    pass
+                return df.copy()
+            except Exception:
+                pass
         return None
 
     @staticmethod
     def save_uploaded_dataset(file_content: bytes, filename: str) -> DatasetInspectionResponse:
-        """Saves uploaded CSV or Excel to CURRENT_DATASET_PATH and returns inspection response."""
+        """Saves uploaded CSV or Excel to memory and current_dataset.csv, returning inspection response."""
         lower = filename.lower()
         if lower.endswith(".csv"):
-            with open(CURRENT_DATASET_PATH, "wb") as f:
-                f.write(file_content)
-            df = pd.read_csv(CURRENT_DATASET_PATH)
+            df = pd.read_csv(io.BytesIO(file_content))
         elif lower.endswith(".xlsx") or lower.endswith(".xls"):
-            temp_path = os.path.join(DATA_DIR, "temp_upload" + os.path.splitext(filename)[1])
-            with open(temp_path, "wb") as f:
-                f.write(file_content)
-            df = pd.read_excel(temp_path)
-            df.to_csv(CURRENT_DATASET_PATH, index=False)
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            df = pd.read_excel(io.BytesIO(file_content))
         else:
             raise ValueError("Unsupported file type. Please upload a CSV (.csv) or Excel (.xlsx, .xls) file.")
+
+        MLService._in_memory_df = df
+        try:
+            with open(get_current_dataset_path(), "wb") as f:
+                f.write(file_content)
+        except Exception as e:
+            logger.warning(f"Could not cache uploaded file to disk: {e}")
 
         return inspect_dataframe_extended(df, filename, source="Uploaded Civic Dataset")
 
@@ -404,7 +436,12 @@ class MLService:
             "residual_std": residual_std,
             "trained_at": trained_at_iso
         }
-        joblib.dump(model_payload, SAVED_MODEL_PATH)
+        MLService._in_memory_model_payload = model_payload
+        try:
+            save_path = get_saved_model_path()
+            joblib.dump(model_payload, save_path)
+        except Exception as e:
+            logger.warning(f"Could not persist model artifact to disk: {e}")
 
         return TrainModelResponse(
             success=True,
@@ -420,11 +457,18 @@ class MLService:
     @staticmethod
     def get_model_status() -> ModelStatusResponse:
         """Returns the status and metrics of the currently saved model."""
-        if not os.path.exists(SAVED_MODEL_PATH):
-            return ModelStatusResponse(is_trained=False)
+        payload = MLService._in_memory_model_payload
+        if payload is None:
+            model_path = resolve_model_path_for_reading()
+            if not model_path:
+                return ModelStatusResponse(is_trained=False)
+            try:
+                payload = joblib.load(model_path)
+            except Exception as e:
+                logger.warning(f"Failed to load saved model from {model_path}: {e}")
+                return ModelStatusResponse(is_trained=False)
 
         try:
-            payload = joblib.load(SAVED_MODEL_PATH)
             metrics_obj = ValidationMetrics(**payload["metrics"]) if "metrics" in payload else None
             fi_list = [FeatureImportanceItem(**fi) for fi in payload.get("feature_importances", [])]
             return ModelStatusResponse(
@@ -442,10 +486,12 @@ class MLService:
     @staticmethod
     def predict_ward(ward_id: str, horizon_months: int = 1) -> PredictResponse:
         """Runs actual inference for a selected ward using the saved trained pipeline."""
-        if not os.path.exists(SAVED_MODEL_PATH):
-            raise ValueError("Train a model before generating predictions. No trained model found on backend.")
-
-        payload = joblib.load(SAVED_MODEL_PATH)
+        payload = MLService._in_memory_model_payload
+        if payload is None:
+            model_path = resolve_model_path_for_reading()
+            if not model_path:
+                raise ValueError("Train a model before generating predictions. No trained model found on backend.")
+            payload = joblib.load(model_path)
         pipeline = payload["pipeline"]
         features_used = payload["features_used"]
         target_column = payload["target_column"]
@@ -544,10 +590,12 @@ class MLService:
     @staticmethod
     def get_resource_ranking() -> ResourceRankingResponse:
         """Ranks all wards by actual predicted complaint demand from the saved trained model."""
-        if not os.path.exists(SAVED_MODEL_PATH):
-            raise ValueError("Train a model before generating predictions. Model is not trained.")
-
-        payload = joblib.load(SAVED_MODEL_PATH)
+        payload = MLService._in_memory_model_payload
+        if payload is None:
+            model_path = resolve_model_path_for_reading()
+            if not model_path:
+                raise ValueError("Train a model before generating predictions. Model is not trained.")
+            payload = joblib.load(model_path)
         pipeline = payload["pipeline"]
         features_used = payload["features_used"]
         target_column = payload["target_column"]
