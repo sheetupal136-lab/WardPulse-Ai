@@ -21,6 +21,7 @@ export interface DatasetRegistryItemBackend {
   mode: 'ward_analysis' | 'complaint_prediction' | 'grievance_logs' | 'spatial_geometry';
   available_features: string[];
   missing_data_explanation?: string;
+  is_available?: boolean;
 }
 
 export interface DatasetRegistryResponseBackend {
@@ -218,6 +219,95 @@ export async function joinComplaintsApi(): Promise<DatasetInspectionBackend> {
 
 export async function getGeoJsonApi(): Promise<any> {
   return apiClient<any>('/ml/geojson', {
+    method: 'GET',
+  });
+}
+
+export interface CategoryPredictionItemBackend {
+  category: string;
+  display_name: string;
+  department: string;
+  probability: number;
+  probability_pct: number;
+  expected_count: number;
+  baseline_count: number;
+  diff: number;
+  pct_change: number | null;
+  recommended_action: string;
+  required_resources: string;
+  approval_status: string;
+  priority: 'Critical' | 'Elevated' | 'Moderate' | 'Normal';
+}
+
+export interface WardCategoryPredictionBackend {
+  ward_id: string;
+  ward_name: string;
+  zone: string;
+  horizon_days: number;
+  horizon_months: number;
+  total_predicted_demand: number;
+  total_baseline_demand: number;
+  categories: CategoryPredictionItemBackend[];
+  status: 'available' | 'unavailable';
+  missing_data_reason?: string;
+  predicted_at: string;
+}
+
+export interface PerClassMetricsBackend {
+  category: string;
+  display_name: string;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  support: number;
+}
+
+export interface CategoryClassificationMetricsBackend {
+  accuracy: number;
+  macro_f1: number;
+  weighted_f1: number;
+  macro_precision: number;
+  macro_recall: number;
+  per_class: PerClassMetricsBackend[];
+  sample_count: number;
+  test_strategy: string;
+}
+
+export interface CategoryCountForecastMetricsBackend {
+  mae: number;
+  rmse: number;
+  r2: number;
+  baseline_mae: number;
+  baseline_rmse: number;
+  baseline_r2: number;
+  evaluation_window: string;
+}
+
+export interface CategoryModelEvaluationBackend {
+  is_trained: boolean;
+  model_name: string;
+  dataset_version: string;
+  classification_metrics?: CategoryClassificationMetricsBackend;
+  forecast_metrics?: CategoryCountForecastMetricsBackend;
+  evaluated_at?: string;
+  status: 'available' | 'unavailable';
+  missing_data_reason?: string;
+}
+
+export async function getCategoryPredictionApi(wardId: string, horizonDays: number = 30): Promise<WardCategoryPredictionBackend> {
+  return apiClient<WardCategoryPredictionBackend>(`/ml/categories/predict/${encodeURIComponent(wardId)}?horizon_days=${horizonDays}`, {
+    method: 'GET',
+  });
+}
+
+export async function getCategoryEvaluationApi(): Promise<CategoryModelEvaluationBackend> {
+  return apiClient<CategoryModelEvaluationBackend>('/ml/categories/evaluation', {
+    method: 'GET',
+  });
+}
+
+export async function getCategoryStatusApi(): Promise<{ is_available: boolean; status: string; message: string }> {
+  return apiClient<{ is_available: boolean; status: string; message: string }>('/ml/categories/status', {
     method: 'GET',
   });
 }

@@ -22,29 +22,52 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Datasets / Uploads (do not commit uploaded or raw data)
-/data/
-/uploads/
-/backend/uploads/
-/backend/data/
-*.csv
+# Datasets / Uploads (ignore user uploads and temporary working datasets)
+uploads/
+backend/uploads/
+backend/data/current_dataset.csv
+backend/data/temp_*
+data/raw/manual_test/
 *.xlsx
 *.xls
 *.tsv
 *.parquet
 *.jsonl
 
-# Machine Learning / Trained Model Artifacts (weights, serialized pipelines)
+# Ignore raw 50MB+ grievances log from standard git
+backend/data/raw/p3-ward-civic-demand/grievances_public_wards.csv
+hack-day-lucknow-datasets/p3-ward-civic-demand/grievances_public_wards.csv
+
+# Default ignore for general csv files
+*.csv
+
+# Whitelist authentic bundled hackathon benchmark datasets required for cloud deployment
+!backend/data/municipal_ward_complaints_training.csv
+!backend/data/municipal_ward_cold_start_test.csv
+!backend/data/raw/
+!backend/data/raw/p3-ward-civic-demand/
+!backend/data/raw/p3-ward-civic-demand/ward_features.csv
+!backend/data/raw/p3-ward-civic-demand/wards.geojson
+!backend/data/raw/p3-ward-civic-demand/prediction_grid_template.csv
+!backend/data/raw/p3-ward-civic-demand/README.md
+!data/
+!data/municipal_ward_complaints_training.csv
+!data/municipal_ward_cold_start_test.csv
+
+# Machine Learning / Trained Model Artifacts
 /models/
 /backend/models/
 !backend/app/models/
 *.pkl
-*.joblib
 *.onnx
 *.pt
 *.pth
 *.h5
 *.keras
+
+# Whitelist lightweight pre-trained baseline models for immediate zero-config cold start
+!backend/saved_models/
+!backend/saved_models/*.joblib
 
 # Environment Secrets & Configs
 .env

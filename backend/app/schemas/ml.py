@@ -30,6 +30,7 @@ class DatasetRegistryItem(BaseModel):
     mode: str  # "ward_analysis" | "complaint_prediction" | "spatial_geometry"
     available_features: List[str]
     missing_data_explanation: Optional[str] = None
+    is_available: bool = True
 
 class DatasetRegistryResponse(BaseModel):
     datasets: List[DatasetRegistryItem]

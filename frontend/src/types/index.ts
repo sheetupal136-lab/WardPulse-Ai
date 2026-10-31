@@ -49,6 +49,7 @@ export interface DatasetRegistryItem {
   mode: 'ward_analysis' | 'complaint_prediction' | 'grievance_logs' | 'spatial_geometry';
   availableFeatures: string[];
   missingDataExplanation?: string;
+  isAvailable?: boolean;
 }
 
 export interface FeatureImportance {
@@ -132,4 +133,75 @@ export interface GeoJsonMetadata {
   propertiesList: string[];
   bounds: [[number, number], [number, number]] | null;
   raw: FeatureCollection;
+}
+
+export interface CategoryPredictionItem {
+  category: string;
+  displayName: string;
+  department: string;
+  probability: number;
+  probabilityPct: number;
+  expectedCount: number;
+  baselineCount: number;
+  diff: number;
+  pctChange: number | null;
+  recommendedAction: string;
+  requiredResources: string;
+  approvalStatus: string;
+  priority: 'Critical' | 'Elevated' | 'Moderate' | 'Normal';
+}
+
+export interface WardCategoryPrediction {
+  wardId: string;
+  wardName: string;
+  zone: string;
+  horizonDays: number;
+  horizonMonths: number;
+  totalPredictedDemand: number;
+  totalBaselineDemand: number;
+  categories: CategoryPredictionItem[];
+  status: 'available' | 'unavailable';
+  missingDataReason?: string;
+  predictedAt: string;
+}
+
+export interface PerClassMetrics {
+  category: string;
+  displayName: string;
+  precision: number;
+  recall: number;
+  f1Score: number;
+  support: number;
+}
+
+export interface CategoryClassificationMetrics {
+  accuracy: number;
+  macroF1: number;
+  weightedF1: number;
+  macroPrecision: number;
+  macroRecall: number;
+  perClass: PerClassMetrics[];
+  sampleCount: number;
+  testStrategy: string;
+}
+
+export interface CategoryForecastMetrics {
+  mae: number;
+  rmse: number;
+  r2: number;
+  baselineMae: number;
+  baselineRmse: number;
+  baselineR2: number;
+  evaluationWindow: string;
+}
+
+export interface CategoryModelEvaluation {
+  isTrained: boolean;
+  modelName: string;
+  datasetVersion: string;
+  classificationMetrics?: CategoryClassificationMetrics;
+  forecastMetrics?: CategoryForecastMetrics;
+  evaluatedAt?: string;
+  status: 'available' | 'unavailable';
+  missingDataReason?: string;
 }

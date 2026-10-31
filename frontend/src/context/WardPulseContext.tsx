@@ -12,7 +12,9 @@ import type {
   ChoroplethMode,
   GeoJsonMetadata,
   CurrentPrediction,
-  DatasetRegistryItem
+  DatasetRegistryItem,
+  WardCategoryPrediction,
+  CategoryModelEvaluation
 } from '../types';
 import { SAMPLE_DISTRICT_GEOJSON } from '../data/sampleGeoJson';
 import { validateGeoJson } from '../utils/geoJsonValidator';
@@ -26,7 +28,9 @@ import {
   getDatasetRegistryApi,
   loadHackathonDatasetApi,
   joinComplaintsApi,
-  getGeoJsonApi
+  getGeoJsonApi,
+  getCategoryPredictionApi,
+  getCategoryEvaluationApi
 } from '../api/ml';
 import type { WardCoordinateBackend } from '../api/ml';
 
@@ -62,6 +66,13 @@ interface WardPulseContextType {
   isPredicting: boolean;
   predictionError: string | null;
   generatePrediction: (wardId: string, horizonMonths?: number) => Promise<{ success: boolean; message?: string }>;
+  categoryPrediction: WardCategoryPrediction | null;
+  isCategoryPredicting: boolean;
+  categoryPredictionError: string | null;
+  categoryHorizonDays: number;
+  setCategoryHorizonDays: (days: number) => void;
+  categoryEvaluation: CategoryModelEvaluation | null;
+  loadCategoryPrediction: (wardId: string, horizonDays?: number) => Promise<{ success: boolean; message?: string }>;
   wards: WardItem[];
   selectedWardId: string | null;
   setSelectedWardId: (id: string | null) => void;
@@ -129,6 +140,13 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isPredicting, setIsPredicting] = useState<boolean>(false);
   const [predictionError, setPredictionError] = useState<string | null>(null);
 
+  // Category predictions state
+  const [categoryPrediction, setCategoryPrediction] = useState<WardCategoryPrediction | null>(null);
+  const [isCategoryPredicting, setIsCategoryPredicting] = useState<boolean>(false);
+  const [categoryPredictionError, setCategoryPredictionError] = useState<string | null>(null);
+  const [categoryHorizonDays, setCategoryHorizonDays] = useState<number>(30);
+  const [categoryEvaluation, setCategoryEvaluation] = useState<CategoryModelEvaluation | null>(null);
+
   // Selected ward
   const [selectedWardId, setSelectedWardId] = useState<string | null>(null);
 
@@ -180,7 +198,8 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             hasComplaintTarget: d.has_complaint_target,
             mode: d.mode,
             availableFeatures: d.available_features,
-            missingDataExplanation: d.missing_data_explanation
+            missingDataExplanation: d.missing_data_explanation,
+            isAvailable: d.is_available ?? true
           })));
         }
       } catch (rErr) {
@@ -276,6 +295,100 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } catch {
           // Ranking not loaded yet
         }
+
+        // Pre-load benchmark prediction for Ward 4 (Yelahanka Satellite Town)
+        try {
+          const pRes = await predictWardApi({ ward_id: '4', horizon_months: 1 });
+          setCurrentPrediction({
+            wardId: pRes.ward_id,
+            wardName: pRes.ward_name,
+            zone: pRes.zone,
+            population: pRes.population,
+            predictedDemand: pRes.predicted_demand,
+            baselineDemand: pRes.baseline_demand ?? null,
+            diff: pRes.diff ?? null,
+            pctChange: pRes.pct_change ?? null,
+            confidenceInterval: pRes.confidence_interval,
+            modelName: pRes.model_name,
+            targetColumn: pRes.target_column,
+            featuresUsed: pRes.features_used,
+            topDrivingFeatures: pRes.top_driving_features,
+            predictedAt: pRes.predicted_at
+          });
+          setSelectedWardId('4');
+
+          // Pre-load category evaluation metrics and Ward 4 category predictions
+          const evalRes = await getCategoryEvaluationApi();
+          if (evalRes && evalRes.is_trained) {
+            setCategoryEvaluation({
+              isTrained: evalRes.is_trained,
+              modelName: evalRes.model_name,
+              datasetVersion: evalRes.dataset_version,
+              classificationMetrics: evalRes.classification_metrics ? {
+                accuracy: evalRes.classification_metrics.accuracy,
+                macroF1: evalRes.classification_metrics.macro_f1,
+                weightedF1: evalRes.classification_metrics.weighted_f1,
+                macroPrecision: evalRes.classification_metrics.macro_precision,
+                macroRecall: evalRes.classification_metrics.macro_recall,
+                perClass: evalRes.classification_metrics.per_class.map(pc => ({
+                  category: pc.category,
+                  displayName: pc.display_name,
+                  precision: pc.precision,
+                  recall: pc.recall,
+                  f1Score: pc.f1_score,
+                  support: pc.support
+                })),
+                sampleCount: evalRes.classification_metrics.sample_count,
+                testStrategy: evalRes.classification_metrics.test_strategy
+              } : undefined,
+              forecastMetrics: evalRes.forecast_metrics ? {
+                mae: evalRes.forecast_metrics.mae,
+                rmse: evalRes.forecast_metrics.rmse,
+                r2: evalRes.forecast_metrics.r2,
+                baselineMae: evalRes.forecast_metrics.baseline_mae,
+                baselineRmse: evalRes.forecast_metrics.baseline_rmse,
+                baselineR2: evalRes.forecast_metrics.baseline_r2,
+                evaluationWindow: evalRes.forecast_metrics.evaluation_window
+              } : undefined,
+              evaluatedAt: evalRes.evaluated_at,
+              status: evalRes.status,
+              missingDataReason: evalRes.missing_data_reason
+            });
+          }
+
+          const catRes = await getCategoryPredictionApi('4', 30);
+          if (catRes) {
+            setCategoryPrediction({
+              wardId: catRes.ward_id,
+              wardName: catRes.ward_name,
+              zone: catRes.zone,
+              horizonDays: catRes.horizon_days,
+              horizonMonths: catRes.horizon_months,
+              totalPredictedDemand: catRes.total_predicted_demand,
+              totalBaselineDemand: catRes.total_baseline_demand,
+              categories: catRes.categories.map(c => ({
+                category: c.category,
+                displayName: c.display_name,
+                department: c.department,
+                probability: c.probability,
+                probabilityPct: c.probability_pct,
+                expectedCount: c.expected_count,
+                baselineCount: c.baseline_count,
+                diff: c.diff,
+                pctChange: c.pct_change,
+                recommendedAction: c.recommended_action,
+                requiredResources: c.required_resources,
+                approvalStatus: c.approval_status,
+                priority: c.priority
+              })),
+              status: catRes.status,
+              missingDataReason: catRes.missing_data_reason,
+              predictedAt: catRes.predicted_at
+            });
+          }
+        } catch {
+          // Prediction can be requested on demand
+        }
       }
     } catch (err) {
       console.warn('Initial backend sync:', err);
@@ -306,8 +419,17 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         columnCount: res.column_count,
         columns: mappedColumns,
         uploadedAt: new Date().toISOString(),
-        rows: res.preview_rows
+        rows: res.preview_rows,
+        mode: res.mode,
+        source: res.source,
+        datasetId: res.dataset_id,
+        canJoinComplaints: res.can_join_complaints,
+        missingDataExplanation: res.missing_data_explanation
       });
+
+      if (res.ward_coordinates && res.ward_coordinates.length > 0) {
+        setWardCoordinates(res.ward_coordinates);
+      }
 
       setCandidateTargets(res.candidate_targets);
       setHasValidComplaintTarget(res.has_valid_complaint_target);
@@ -318,21 +440,57 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setSelectedTarget('');
       }
 
-      setModelStatus('idle');
-      setModelMetrics(null);
-      setCurrentPrediction(null);
-      setResourcePlans([]);
+      // Preserve model status and refresh rankings for uploaded dataset
+      try {
+        const statusRes = await getTrainingStatusApi();
+        if (statusRes.is_trained && statusRes.metrics) {
+          setModelStatus('completed');
+          setModelMetrics({
+            mae: statusRes.metrics.mae,
+            rmse: statusRes.metrics.rmse,
+            r2: statusRes.metrics.r2,
+            accuracy: Math.round(statusRes.metrics.r2 * 100),
+            trainedAt: statusRes.trained_at || new Date().toISOString(),
+            targetVariable: statusRes.target_column || 'monthly_complaint_demand',
+            featuresUsed: statusRes.features_used || [],
+            featureImportances: statusRes.feature_importances || [],
+            baselineMae: statusRes.metrics.baseline_mae,
+            baselineRmse: statusRes.metrics.baseline_rmse,
+            validationStrategy: statusRes.metrics.validation_strategy,
+            testWardCount: statusRes.metrics.test_ward_count,
+            sampleCount: statusRes.metrics.sample_count,
+            modelName: statusRes.model_name
+          });
 
-      if (!res.has_valid_complaint_target) {
-        return {
-          success: false,
-          message: res.target_validation_message || 'Uploaded file contains no legitimate complaint demand target column.'
-        };
+          const rankRes = await getResourceRankingApi();
+          if (rankRes && rankRes.items) {
+            setResourcePlans(rankRes.items.map(it => ({
+              rank: it.rank,
+              wardId: it.ward_id,
+              wardName: it.ward_name,
+              zone: it.zone,
+              priority: it.priority,
+              population: it.population,
+              recordedComplaints: it.recorded_complaints,
+              predictedDemand: it.predicted_demand,
+              uncertainty: it.uncertainty_bounds,
+              inspectionAction: it.inspection_directive,
+              actionSummary: it.priority === 'Critical' ? 'Immediate inter-agency dispatch' : 'Scheduled patrol'
+            })));
+            setResourceRankingMethodology(rankRes.ranking_methodology);
+          }
+        }
+      } catch (rErr) {
+        console.warn('Rank refresh after upload:', rErr);
       }
+
+      const infoMsg = res.candidate_targets.length > 0
+        ? `Successfully loaded ${res.filename} (${res.row_count} records). Model is ready for prediction (Detected target: ${res.candidate_targets.join(', ')}).`
+        : `Successfully loaded ${res.filename} (${res.row_count} records). Pre-trained model is active and ready to predict complaint demand.`;
 
       return {
         success: true,
-        message: `Successfully uploaded ${res.row_count} records. Detected target: ${res.candidate_targets.join(', ')}.`
+        message: infoMsg
       };
     } catch (err: any) {
       return {
@@ -385,11 +543,51 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (newMode === 'complaint_prediction') {
         setSelectedTarget(res.candidate_targets[0] || 'monthly_complaint_demand');
       } else {
-        setSelectedTarget('');
-        setModelStatus('idle');
-        setModelMetrics(null);
-        setCurrentPrediction(null);
-        setResourcePlans([]);
+        setSelectedTarget(res.candidate_targets[0] || '');
+      }
+
+      // Preserve model status and refresh rankings for loaded dataset
+      try {
+        const statusRes = await getTrainingStatusApi();
+        if (statusRes.is_trained && statusRes.metrics) {
+          setModelStatus('completed');
+          setModelMetrics({
+            mae: statusRes.metrics.mae,
+            rmse: statusRes.metrics.rmse,
+            r2: statusRes.metrics.r2,
+            accuracy: Math.round(statusRes.metrics.r2 * 100),
+            trainedAt: statusRes.trained_at || new Date().toISOString(),
+            targetVariable: statusRes.target_column || 'monthly_complaint_demand',
+            featuresUsed: statusRes.features_used || [],
+            featureImportances: statusRes.feature_importances || [],
+            baselineMae: statusRes.metrics.baseline_mae,
+            baselineRmse: statusRes.metrics.baseline_rmse,
+            validationStrategy: statusRes.metrics.validation_strategy,
+            testWardCount: statusRes.metrics.test_ward_count,
+            sampleCount: statusRes.metrics.sample_count,
+            modelName: statusRes.model_name
+          });
+
+          const rankRes = await getResourceRankingApi();
+          if (rankRes && rankRes.items) {
+            setResourcePlans(rankRes.items.map(it => ({
+              rank: it.rank,
+              wardId: it.ward_id,
+              wardName: it.ward_name,
+              zone: it.zone,
+              priority: it.priority,
+              population: it.population,
+              recordedComplaints: it.recorded_complaints,
+              predictedDemand: it.predicted_demand,
+              uncertainty: it.uncertainty_bounds,
+              inspectionAction: it.inspection_directive,
+              actionSummary: it.priority === 'Critical' ? 'Immediate inter-agency dispatch' : 'Scheduled patrol'
+            })));
+            setResourceRankingMethodology(rankRes.ranking_methodology);
+          }
+        }
+      } catch (rErr) {
+        console.warn('Rank refresh after load:', rErr);
       }
 
       // Automatically load official GeoJSON boundaries onto the map
@@ -614,6 +812,50 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  // Real Backend Category Prediction
+  const loadCategoryPrediction = useCallback(async (wardId: string, horizonDays?: number): Promise<{ success: boolean; message?: string }> => {
+    setIsCategoryPredicting(true);
+    setCategoryPredictionError(null);
+    const days = horizonDays || categoryHorizonDays;
+    try {
+      const res = await getCategoryPredictionApi(wardId, days);
+      setCategoryPrediction({
+        wardId: res.ward_id,
+        wardName: res.ward_name,
+        zone: res.zone,
+        horizonDays: res.horizon_days,
+        horizonMonths: res.horizon_months,
+        totalPredictedDemand: res.total_predicted_demand,
+        totalBaselineDemand: res.total_baseline_demand,
+        categories: res.categories.map(c => ({
+          category: c.category,
+          displayName: c.display_name,
+          department: c.department,
+          probability: c.probability,
+          probabilityPct: c.probability_pct,
+          expectedCount: c.expected_count,
+          baselineCount: c.baseline_count,
+          diff: c.diff,
+          pctChange: c.pct_change,
+          recommendedAction: c.recommended_action,
+          requiredResources: c.required_resources,
+          approvalStatus: c.approval_status,
+          priority: c.priority
+        })),
+        status: res.status,
+        missingDataReason: res.missing_data_reason,
+        predictedAt: res.predicted_at
+      });
+      setIsCategoryPredicting(false);
+      return { success: true };
+    } catch (err: any) {
+      setIsCategoryPredicting(false);
+      const errMsg = err.message || 'Failed to generate category prediction.';
+      setCategoryPredictionError(errMsg);
+      return { success: false, message: errMsg };
+    }
+  }, [categoryHorizonDays]);
+
   // Real Backend Prediction Inference
   const generatePrediction = async (wardId: string, horizonMonths: number = 1): Promise<{ success: boolean; message?: string }> => {
     if (modelStatus !== 'completed') {
@@ -649,6 +891,12 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
 
       setSelectedWardId(res.ward_id);
+
+      // Simultaneously trigger category-wise demand prediction
+      const days = horizonMonths * 30;
+      setCategoryHorizonDays(days);
+      loadCategoryPrediction(res.ward_id, days);
+
       setIsPredicting(false);
       return { success: true };
     } catch (err: any) {
@@ -775,6 +1023,13 @@ export const WardPulseProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isPredicting,
         predictionError,
         generatePrediction,
+        categoryPrediction,
+        isCategoryPredicting,
+        categoryPredictionError,
+        categoryHorizonDays,
+        setCategoryHorizonDays,
+        categoryEvaluation,
+        loadCategoryPrediction,
         wards,
         selectedWardId,
         setSelectedWardId,

@@ -8,12 +8,83 @@ import {
   Info,
   CheckCircle2,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Zap,
+  Trash2,
+  Construction,
+  HeartPulse,
+  Trees,
+  FileText,
+  Clock,
+  Check
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWardPulse } from '../context/WardPulseContext';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
+
+const DEPARTMENT_DIRECTIVES = [
+  {
+    id: 'electrical',
+    category: 'Electrical & Power',
+    deptName: 'Streetlighting & Electrical Wing (BESCOM)',
+    icon: Zap,
+    color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50',
+    staffing: '4 Line Electrician Crews & 2 Master Supervisors',
+    equipment: '2 Hydraulic Bucket Trucks, 80 Heavy-Duty LED Fixtures, 1.2km Replacement Cable',
+    rationale: 'Forecasted as #1 citywide complaint volume (~40.5% share). High streetlight failure rates and evening visibility risks require preventative feeder audits.'
+  },
+  {
+    id: 'solid_waste',
+    category: 'Solid Waste Management',
+    deptName: 'Solid Waste Management (SWM) & Health Wing',
+    icon: Trash2,
+    color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50',
+    staffing: '18 Sanitation Workers & 3 Zonal Health Marshals',
+    equipment: '3 Hydraulic Compactor Trucks, 6 Tippers, Disinfectant Spray Units',
+    rationale: 'Accounts for ~24.8% of grievances. Waste backlog in high-density wards leads to secondary dumping and severe public health complaints.'
+  },
+  {
+    id: 'roads',
+    category: 'Roads & Infrastructure',
+    deptName: 'Major Roads & Engineering Wing',
+    icon: Construction,
+    color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50',
+    staffing: '8 Asphalt Paving Laborers & 2 Quality Control Engineers',
+    equipment: '1 Pothole Jetpatcher, 1 Mini Roller, 40 Tons Bitumen Hot-Mix',
+    rationale: 'Surges sharply post-rainfall (up to ~18.9% demand). Road cratering and drain siltation directly impact traffic velocity and commuter safety.'
+  },
+  {
+    id: 'animals_health',
+    category: 'Animal Control & Health',
+    deptName: 'Animal Husbandry & Public Health Wing',
+    icon: HeartPulse,
+    color: 'text-rose-500 bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/50',
+    staffing: '4 Canine Handlers & 1 Veterinary Doctor',
+    equipment: '2 Canine Rescue Vans, Animal Restraint Kits, 2 Thermal Fogging Units',
+    rationale: 'Seasonal vector and stray dog complaints climb to ~11% in monsoon/summer months. Prompt response mitigates rabies and vector-borne outbreak risks.'
+  },
+  {
+    id: 'trees',
+    category: 'Forestry & Tree Clearance',
+    deptName: 'Forestry & Tree Clearance Department',
+    icon: Trees,
+    color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-900/50',
+    staffing: '4 Arborist Chainsaw Operators & 2 Pruning Crew Leads',
+    equipment: '1 High-Reach Hydraulic Tree Pruner Crane, 2 Chainsaws, 1 Mobile Wood Chipper',
+    rationale: 'Squall winds and pre-monsoon rains cause tree branch snapping across arterial roads, causing blockages and severing power lines.'
+  },
+  {
+    id: 'other',
+    category: 'Civic Administration',
+    deptName: 'Revenue, Town Planning & Public Redressal',
+    icon: FileText,
+    color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/50',
+    staffing: '2 Civic Revenue Inspectors & 1 Legal Redressal Officer',
+    equipment: 'Mobile Tablet Enforcement Terminals, Digital Encroachment Survey Kits',
+    rationale: 'Encroachment, trade license and noise complaints require inter-departmental site visits and formal regulatory enforcement notices.'
+  }
+];
 
 export const ResourcePlannerView: React.FC = () => {
   const { 
@@ -28,6 +99,11 @@ export const ResourcePlannerView: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
+  const [approvedDepts, setApprovedDepts] = useState<Record<string, boolean>>({});
+
+  const toggleApproval = (id: string) => {
+    setApprovedDepts(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const isDataLoaded = Boolean(dataset && dataset.rows.length > 0);
   const isModelTrained = modelStatus === 'completed';
@@ -228,6 +304,118 @@ export const ResourcePlannerView: React.FC = () => {
             Ready to Deploy
           </div>
           <p className="text-[11px] text-[var(--text-muted)] mt-1">All action directives calibrated</p>
+        </div>
+      </motion.div>
+
+      {/* Department Resource Allocation & Staffing Directives */}
+      <motion.div 
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.05 }}
+        className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 shadow-xs space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-color)]">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                CATEGORY-LINKED ALLOCATION
+              </span>
+              <h3 className="text-sm font-bold text-[var(--text-main)]">
+                Municipal Department Staffing & Equipment Directives
+              </h3>
+            </div>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Targeted crew recommendations mapped to predicted complaint categories. Requires administrative sign-off before field dispatch.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[11px] text-[var(--text-muted)]">
+              Directives Approved: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{Object.values(approvedDepts).filter(Boolean).length} of {DEPARTMENT_DIRECTIVES.length}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {DEPARTMENT_DIRECTIVES.map((dept) => {
+            const Icon = dept.icon;
+            const isApproved = Boolean(approvedDepts[dept.id]);
+
+            return (
+              <div
+                key={dept.id}
+                className={`rounded-xl border p-4 flex flex-col justify-between space-y-3 transition-all ${
+                  isApproved 
+                    ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-950/20' 
+                    : 'border-[var(--border-color)] bg-[var(--bg-card-subtle)]/40'
+                }`}
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${dept.color}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--text-main)] leading-tight">
+                          {dept.deptName}
+                        </h4>
+                        <span className="text-[10px] text-[var(--text-muted)] block">
+                          Category: {dept.category}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Staffing & Equipment */}
+                  <div className="p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)]/70 text-xs space-y-1">
+                    <div>
+                      <span className="text-[10px] font-bold text-[var(--text-main)] block">Recommended Staffing:</span>
+                      <p className="text-[11px] text-[var(--text-muted)] leading-tight">{dept.staffing}</p>
+                    </div>
+                    <div className="pt-1">
+                      <span className="text-[10px] font-bold text-[var(--text-main)] block">Allocated Equipment:</span>
+                      <p className="text-[11px] text-[var(--text-muted)] leading-tight">{dept.equipment}</p>
+                    </div>
+                  </div>
+
+                  {/* Rationale */}
+                  <div className="text-[11px] text-[var(--text-muted)] space-y-0.5">
+                    <strong className="text-[10px] text-[var(--text-main)] block uppercase tracking-wider">
+                      Recommendation Rationale:
+                    </strong>
+                    <p className="leading-relaxed text-[11px]">{dept.rationale}</p>
+                  </div>
+                </div>
+
+                {/* Approval Control Button */}
+                <div className="pt-2 border-t border-[var(--border-color)]/60 flex items-center justify-between">
+                  {isApproved ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Approved for Dispatch</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                      <Clock className="w-3 h-3" />
+                      <span>Awaiting Approval</span>
+                    </span>
+                  )}
+
+                  <button
+                    onClick={() => toggleApproval(dept.id)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-xs ${
+                      isApproved
+                        ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-300'
+                        : 'bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]'
+                    }`}
+                  >
+                    {isApproved ? 'Revoke' : 'Approve Directive'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </motion.div>
 

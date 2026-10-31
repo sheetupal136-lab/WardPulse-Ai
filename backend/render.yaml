@@ -1,0 +1,19 @@
+# Render Blueprint for WardPulse AI FastAPI Backend
+services:
+  - type: web
+    name: wardpulse-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: CORS_ORIGINS
+        value: "http://localhost:5173,http://127.0.0.1:5173,https://wardpulse-ai.vercel.app"
+      - key: FRONTEND_URL
+        value: "https://wardpulse-ai.vercel.app"
+      - key: PROJECT_NAME
+        value: "WardPulse AI Backend"
+      - key: PORT
+        value: "8000"

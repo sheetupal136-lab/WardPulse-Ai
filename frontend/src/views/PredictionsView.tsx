@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 import { useWardPulse } from '../context/WardPulseContext';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
+import { PredictedComplaintCategories } from '../components/predictions/PredictedComplaintCategories';
 
 export const PredictionsView: React.FC = () => {
   const { 
@@ -28,9 +29,7 @@ export const PredictionsView: React.FC = () => {
     predictionError,
     generatePrediction,
     setActiveTab,
-    loadHackathonDataset,
-    joinComplaintHistory,
-    datasetMode
+    loadHackathonDataset
   } = useWardPulse();
 
   const [horizonMonths, setHorizonMonths] = useState<number>(1);
@@ -56,25 +55,6 @@ export const PredictionsView: React.FC = () => {
     );
   }
 
-  if (datasetMode === 'ward_analysis' && !isModelTrained) {
-    return (
-      <EmptyState
-        icon={Cpu}
-        title="Complaint Prediction Mode Disabled"
-        description="The application is currently in Ward Analysis Mode (ward_features.csv). Historical complaint records are absent from this demographic file. To enable predictions, join the complaint history (grievances_public_wards.csv) on ward_id."
-        primaryAction={{
-          label: 'Join Complaint History (Enable Predictions)',
-          onClick: async () => {
-            await joinComplaintHistory();
-          }
-        }}
-        secondaryAction={{
-          label: 'Explore Wards on Map',
-          onClick: () => setActiveTab('ward-map')
-        }}
-      />
-    );
-  }
 
   if (!isModelTrained) {
     return (
@@ -351,6 +331,11 @@ export const PredictionsView: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* SECTION: Predicted Complaint Categories */}
+          <div className="pt-4">
+            <PredictedComplaintCategories />
           </div>
         </motion.div>
       ) : (

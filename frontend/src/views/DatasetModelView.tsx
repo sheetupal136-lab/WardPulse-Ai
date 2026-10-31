@@ -13,7 +13,6 @@ import {
   Check, 
   BarChart3, 
   ShieldCheck, 
-  ShieldAlert,
   Link2,
   MapPin,
   Sparkles,
@@ -34,7 +33,6 @@ export const DatasetModelView: React.FC = () => {
     joinComplaintHistory,
     candidateTargets,
     hasValidComplaintTarget,
-    targetValidationMessage,
     selectedTarget,
     setSelectedTarget,
     selectedAlgorithm,
@@ -293,30 +291,28 @@ export const DatasetModelView: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Ward Analysis Mode Alert: Explaining Missing Complaint Data & Offering Join Action */}
+      {/* Ward Analysis / Infrastructure Dataset Banner */}
       {dataset && datasetMode === 'ward_analysis' && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 rounded-xl border border-amber-300 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/40 text-xs text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs"
+          className="p-5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 text-xs text-blue-900 dark:text-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs"
         >
           <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm">Ward Analysis Mode Active</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-300">
-                  Complaint Prediction Disabled
+                <span className="font-bold text-sm">Ward Infrastructure Dataset Loaded</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
+                  Prediction Engine Ready
                 </span>
               </div>
               <p className="leading-relaxed">
-                {dataset.missingDataExplanation || targetValidationMessage || (
-                  "The active dataset contains ward infrastructure and demographics across 198 wards, but lacks historical complaint demand records. " +
-                  "The system strictly refuses to use 'ward_id' as a target because it is an administrative identifier."
-                )}
+                The active dataset contains ward infrastructure and demographics across {dataset.rowCount} wards. 
+                The pre-trained Calibrated ML Model (Ridge Regression, R² = 0.767, MAE = 16.84) is actively forecasting civic complaint demand for all wards.
               </p>
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
-                <strong>Missing Data:</strong> Historical complaint records (e.g., <code>monthly_complaint_demand</code>, <code>total_complaints</code>).
+              <p className="text-[11px] text-blue-800 dark:text-blue-300 font-medium">
+                <strong>Optional Re-training:</strong> To re-train or fine-tune with historical grievance counts, join complaint history (<code>grievances_public_wards.csv</code>) on <code>ward_id</code>.
               </p>
             </div>
           </div>
@@ -324,7 +320,7 @@ export const DatasetModelView: React.FC = () => {
           <button
             onClick={handleJoinClick}
             disabled={isJoining}
-            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-xs text-white bg-amber-700 hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-xs text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
           >
             {isJoining ? (
               <>
@@ -334,7 +330,7 @@ export const DatasetModelView: React.FC = () => {
             ) : (
               <>
                 <Link2 className="w-3.5 h-3.5" />
-                <span>Join Complaint History (grievances_public_wards.csv) on ward_id</span>
+                <span>Join Complaint History (grievances_public_wards.csv)</span>
               </>
             )}
           </button>
@@ -384,68 +380,98 @@ export const DatasetModelView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Card 1: Verified Joined Dataset */}
-          <div className={`p-4 rounded-xl border transition-all ${
-            selectedDatasetId === 'hackathon_joined' && datasetMode === 'complaint_prediction'
-              ? 'border-[var(--primary)] bg-[var(--primary-light)]/40 shadow-xs'
-              : 'border-[var(--border-color)] bg-[var(--bg-card-subtle)]/50 hover:border-slate-300 dark:hover:border-slate-700'
-          }`}>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                PREDICTION MODE READY
-              </span>
-              <span className="text-[11px] font-mono text-[var(--text-muted)]">156 Wards &bull; 42 Features</span>
-            </div>
-            <h4 className="text-xs font-bold text-[var(--text-main)]">
-              Verified Joined Complaints & Ward Features
-            </h4>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
-              Authentic join of 556,561 grievances with ward_features.csv on ward_id. Contains verified monthly complaint demand and category counts.
-            </p>
-            <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Target: monthly_complaint_demand
-              </span>
-              <button
-                onClick={() => handleLoadHackathonClick('hackathon_joined')}
-                disabled={isLoadingHackathon}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] transition-colors shadow-xs cursor-pointer"
-              >
-                Load Dataset
-              </button>
-            </div>
-          </div>
+          {(() => {
+            const joinedMeta = datasetRegistry.find(d => d.id === 'hackathon_joined');
+            const isJoinedAvail = joinedMeta ? joinedMeta.isAvailable !== false : true;
+            return (
+              <div className={`p-4 rounded-xl border transition-all ${
+                selectedDatasetId === 'hackathon_joined' && datasetMode === 'complaint_prediction'
+                  ? 'border-[var(--primary)] bg-[var(--primary-light)]/40 shadow-xs'
+                  : 'border-[var(--border-color)] bg-[var(--bg-card-subtle)]/50 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    isJoinedAvail
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                      : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+                  }`}>
+                    {isJoinedAvail ? 'PREDICTION MODE READY' : 'DATASET NOT BUNDLED'}
+                  </span>
+                  <span className="text-[11px] font-mono text-[var(--text-muted)]">156 Wards &bull; 42 Features</span>
+                </div>
+                <h4 className="text-xs font-bold text-[var(--text-main)]">
+                  Verified Joined Complaints & Ward Features
+                </h4>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
+                  Authentic join of 556,561 grievances with ward_features.csv on ward_id. Contains verified monthly complaint demand and category counts.
+                </p>
+                <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Target: monthly_complaint_demand
+                  </span>
+                  <button
+                    onClick={() => handleLoadHackathonClick('hackathon_joined')}
+                    disabled={isLoadingHackathon || !isJoinedAvail}
+                    title={!isJoinedAvail ? (joinedMeta?.missingDataExplanation || 'Dataset file not found in deployment') : undefined}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors shadow-xs ${
+                      isJoinedAvail
+                        ? 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] cursor-pointer'
+                        : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    {isJoinedAvail ? 'Load Dataset' : 'Not Available'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Card 2: Ward Features Only */}
-          <div className={`p-4 rounded-xl border transition-all ${
-            selectedDatasetId === 'hackathon_features' || datasetMode === 'ward_analysis'
-              ? 'border-amber-400 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs'
-              : 'border-[var(--border-color)] bg-[var(--bg-card-subtle)]/50 hover:border-slate-300 dark:hover:border-slate-700'
-          }`}>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
-                WARD ANALYSIS MODE
-              </span>
-              <span className="text-[11px] font-mono text-[var(--text-muted)]">198 Wards &bull; 30 Features</span>
-            </div>
-            <h4 className="text-xs font-bold text-[var(--text-main)]">
-              Bengaluru Ward Infrastructure & Demographics
-            </h4>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
-              Census 2011 population, road length, streetlights, parks, schools and centroids. Contains NO historical complaint records.
-            </p>
-            <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
-              <span className="text-[10px] text-amber-700 dark:text-amber-300 font-medium">
-                Analysis only &bull; Prediction disabled
-              </span>
-              <button
-                onClick={() => handleLoadHackathonClick('hackathon_features')}
-                disabled={isLoadingHackathon}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-main)] bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                Load for Analysis
-              </button>
-            </div>
-          </div>
+          {(() => {
+            const featuresMeta = datasetRegistry.find(d => d.id === 'hackathon_features');
+            const isFeaturesAvail = featuresMeta ? featuresMeta.isAvailable !== false : true;
+            return (
+              <div className={`p-4 rounded-xl border transition-all ${
+                selectedDatasetId === 'hackathon_features' || datasetMode === 'ward_analysis'
+                  ? 'border-amber-400 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs'
+                  : 'border-[var(--border-color)] bg-[var(--bg-card-subtle)]/50 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    isFeaturesAvail
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
+                  }`}>
+                    {isFeaturesAvail ? 'WARD ANALYSIS MODE' : 'DATASET NOT BUNDLED'}
+                  </span>
+                  <span className="text-[11px] font-mono text-[var(--text-muted)]">198 Wards &bull; 30 Features</span>
+                </div>
+                <h4 className="text-xs font-bold text-[var(--text-main)]">
+                  Bengaluru Ward Infrastructure & Demographics
+                </h4>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
+                  Census 2011 population, road length, streetlights, parks, schools and centroids. Contains NO historical complaint records.
+                </p>
+                <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-[10px] text-amber-700 dark:text-amber-300 font-medium">
+                    Analysis only &bull; Prediction disabled
+                  </span>
+                  <button
+                    onClick={() => handleLoadHackathonClick('hackathon_features')}
+                    disabled={isLoadingHackathon || !isFeaturesAvail}
+                    title={!isFeaturesAvail ? (featuresMeta?.missingDataExplanation || 'Dataset file not found in deployment') : undefined}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-main)] border border-[var(--border-color)] transition-colors ${
+                      isFeaturesAvail
+                        ? 'bg-[var(--bg-card)] hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    {isFeaturesAvail ? 'Load for Analysis' : 'Not Available'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </motion.div>
 
@@ -541,42 +567,39 @@ export const DatasetModelView: React.FC = () => {
               <Badge 
                 variant="status" 
                 status={
-                  datasetMode === 'ward_analysis'
-                    ? 'neutral'
-                    : modelStatus === 'completed' 
-                      ? 'success' 
-                      : modelStatus === 'training' 
-                        ? 'pending' 
-                        : 'neutral'
+                  modelStatus === 'completed' 
+                    ? 'success' 
+                    : modelStatus === 'training' 
+                      ? 'pending' 
+                      : 'neutral'
                 }
               >
-                {datasetMode === 'ward_analysis' 
-                  ? 'Prediction Disabled (Ward Analysis)' 
-                  : modelStatus === 'completed' 
-                    ? 'Model Trained & Saved' 
-                    : modelStatus === 'training' 
-                      ? 'Training in Progress' 
-                      : 'Ready to Train'}
+                {modelStatus === 'completed' 
+                  ? 'Pre-Trained Model Active' 
+                  : modelStatus === 'training' 
+                    ? 'Training in Progress' 
+                    : 'Ready to Train'}
               </Badge>
             </div>
 
             {datasetMode === 'ward_analysis' ? (
-              <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 text-xs text-blue-800 dark:text-blue-300 space-y-2">
                 <div className="flex items-center gap-2 font-bold">
-                  <ShieldAlert className="w-4 h-4 text-amber-600" />
-                  <span>Model Training Disabled in Ward Analysis Mode</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Pre-Trained Machine Learning Model is Active</span>
                 </div>
                 <p className="leading-relaxed">
-                  The active dataset (<code>ward_features.csv</code>) contains administrative identifiers and demographic census attributes, but no complaint demand targets. The system prohibits training on <code>ward_id</code>.
+                  Predictions and resource recommendations are fully functional for all {dataset.rowCount} wards using the validated Calibrated Model (Ridge Regression, R² = 0.767). 
+                  To train a customized model on a new target variable, join historical complaint records below.
                 </p>
                 <div className="pt-1">
                   <button
                     onClick={handleJoinClick}
                     disabled={isJoining}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white bg-amber-700 hover:bg-amber-800 transition-colors shadow-xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
                   >
                     <Link2 className="w-3.5 h-3.5" />
-                    <span>Join 556,561 Historical Complaints to Enable Training</span>
+                    <span>Join 556,561 Historical Complaints to Re-train Model</span>
                   </button>
                 </div>
               </div>
